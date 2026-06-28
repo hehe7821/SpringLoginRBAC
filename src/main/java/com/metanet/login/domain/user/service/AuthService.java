@@ -1,14 +1,13 @@
 package com.metanet.login.domain.user.service;
 
 import com.metanet.login.domain.user.dto.LoginRequest;
-import com.metanet.login.domain.user.dto.PasswordResetConfirmRequest;
 import com.metanet.login.domain.user.dto.PasswordResetRequest;
-import com.metanet.login.domain.user.dto.PasswordResetRequestResponse;
 import com.metanet.login.domain.user.dto.RefreshTokenRequest;
 import com.metanet.login.domain.user.dto.SignupRequest;
 import com.metanet.login.domain.user.dto.TokenResponse;
 import com.metanet.login.domain.user.dto.UserResponse;
 import com.metanet.login.domain.user.dto.UserUpdateRequest;
+import com.metanet.login.domain.user.dto.email.EmailVerificationPurpose;
 import com.metanet.login.domain.user.entity.User;
 import com.metanet.login.domain.user.repository.UserRepository;
 import com.metanet.login.global.security.CustomUserDetails;
@@ -26,29 +25,31 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class AuthService {
 	private static final String REFRESH_TOKEN_KEY_PREFIX = "auth:refresh:";
-	private static final String PASSWORD_RESET_KEY_PREFIX = "auth:password-reset:";
-	private static final long PASSWORD_RESET_TOKEN_VALIDITY_SECONDS = 900;
 
 	private final UserRepository userRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenProvider jwtTokenProvider;
 	private final StringRedisTemplate redisTemplate;
+	private final EmailVerificationService emailVerificationService;
 
 	public AuthService(
 			UserRepository userRepository,
 			PasswordEncoder passwordEncoder,
 			JwtTokenProvider jwtTokenProvider,
-			StringRedisTemplate redisTemplate) {
+			StringRedisTemplate redisTemplate,
+			EmailVerificationService emailVerificationService) {
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.jwtTokenProvider = jwtTokenProvider;
 		this.redisTemplate = redisTemplate;
+		this.emailVerificationService = emailVerificationService;
 	}
 
 	@Transactional
 	public TokenResponse signup(SignupRequest request) {
 		validateEmail(request.getEmail());
 		validatePassword(request.getPassword());
+		emailVerificationService.requireVerified(request.getEmail(), EmailVerificationPurpose.SIGNUP);
 		if (userRepository.existsByEmail(request.getEmail())) {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
 		}
@@ -58,6 +59,7 @@ public class AuthService {
 				passwordEncoder.encode(request.getPassword()),
 				blankToNull(request.getDisplayName()));
 		userRepository.assignDefaultUserRole(user.getUserId());
+		emailVerificationService.consumeVerified(request.getEmail(), EmailVerificationPurpose.SIGNUP);
 		return issueTokens(user);
 	}
 
@@ -101,44 +103,19 @@ public class AuthService {
 		redisTemplate.delete(refreshTokenKey(userId));
 	}
 
-	public PasswordResetRequestResponse requestPasswordReset(PasswordResetRequest request) {
+	@Transactional
+	public void resetPassword(PasswordResetRequest request) {
 		validateEmail(request.getEmail());
+		emailVerificationService.requireVerified(request.getEmail(), EmailVerificationPurpose.PASSWORD_RESET);
+		validatePassword(request.getNewPassword());
 		User user = userRepository.findByEmail(request.getEmail());
 		if (user == null) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
 		}
 
-		String resetToken = UUID.randomUUID().toString();
-		redisTemplate.opsForValue().set(
-				passwordResetKey(resetToken),
-				user.getUserId().toString(),
-				Duration.ofSeconds(PASSWORD_RESET_TOKEN_VALIDITY_SECONDS));
-		return new PasswordResetRequestResponse(
-				"Password reset token issued",
-				resetToken,
-				PASSWORD_RESET_TOKEN_VALIDITY_SECONDS);
-	}
-
-	@Transactional
-	public void confirmPasswordReset(PasswordResetConfirmRequest request) {
-		if (request == null || isBlank(request.getResetToken())) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reset token is required");
-		}
-		validatePassword(request.getNewPassword());
-
-		String resetKey = passwordResetKey(request.getResetToken());
-		String userIdValue = redisTemplate.opsForValue().get(resetKey);
-		if (userIdValue == null) {
-			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid reset token");
-		}
-
-		UUID userId = UUID.fromString(userIdValue);
-		int updated = userRepository.updatePassword(userId, passwordEncoder.encode(request.getNewPassword()));
-		if (updated == 0) {
-			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
-		}
-		redisTemplate.delete(resetKey);
-		redisTemplate.delete(refreshTokenKey(userId));
+		userRepository.updatePassword(user.getUserId(), passwordEncoder.encode(request.getNewPassword()));
+		emailVerificationService.consumeVerified(request.getEmail(), EmailVerificationPurpose.PASSWORD_RESET);
+		redisTemplate.delete(refreshTokenKey(user.getUserId()));
 	}
 
 	@Transactional(readOnly = true)
@@ -204,23 +181,8 @@ public class AuthService {
 		return user;
 	}
 
-	private void assertSelfOrAdmin(UUID userId, Authentication authentication) {
-		if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails userDetails)) {
-			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
-		}
-		boolean isAdmin = authentication.getAuthorities().stream()
-				.anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
-		if (!userDetails.getUserId().equals(userId) && !isAdmin) {
-			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Forbidden");
-		}
-	}
-
 	private String refreshTokenKey(UUID userId) {
 		return REFRESH_TOKEN_KEY_PREFIX + userId;
-	}
-
-	private String passwordResetKey(String resetToken) {
-		return PASSWORD_RESET_KEY_PREFIX + resetToken;
 	}
 
 	private UUID currentUserId(Authentication authentication) {
