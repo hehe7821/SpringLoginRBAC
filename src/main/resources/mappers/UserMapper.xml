@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.metanet.login.domain.user.repository.UserRepository">
+    <resultMap id="UserResultMap" type="com.metanet.login.domain.user.entity.User">
+        <id property="userId" column="user_id"/>
+        <result property="email" column="email"/>
+        <result property="passwordHash" column="password_hash"/>
+        <result property="displayName" column="display_name"/>
+        <result property="status" column="status"/>
+        <result property="emailVerifiedAt" column="email_verified_at"/>
+        <result property="lastLoginAt" column="last_login_at"/>
+        <result property="passwordChangedAt" column="password_changed_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="deletedAt" column="deleted_at"/>
+    </resultMap>
+
+    <sql id="userColumns">
+        user_id, email, password_hash, display_name, status, email_verified_at,
+        last_login_at, password_changed_at, created_at, updated_at, deleted_at
+    </sql>
+
+    <select id="findById" resultMap="UserResultMap">
+        select <include refid="userColumns"/>
+        from users
+        where user_id = #{userId}
+          and deleted_at is null
+    </select>
+
+    <select id="findByEmail" resultMap="UserResultMap">
+        select <include refid="userColumns"/>
+        from users
+        where email = #{email}
+          and deleted_at is null
+    </select>
+
+    <select id="existsByEmail" resultType="boolean">
+        select exists (
+            select 1
+            from users
+            where email = #{email}
+              and deleted_at is null
+        )
+    </select>
+
+    <select id="insertUser" resultMap="UserResultMap">
+        insert into users (email, password_hash, display_name)
+        values (#{email}, #{passwordHash}, #{displayName})
+        returning <include refid="userColumns"/>
+    </select>
+
+    <insert id="assignDefaultUserRole">
+        insert into user_roles (user_id, role_id)
+        select #{userId}, role_id
+        from roles
+        where role_code = 'USER'
+          and is_active = true
+        on conflict do nothing
+    </insert>
+
+    <select id="findAuthoritiesByUserId" resultType="string">
+        select 'ROLE_' || r.role_code
+        from user_roles ur
+        join roles r on r.role_id = ur.role_id
+        where ur.user_id = #{userId}
+          and ur.is_active = true
+          and r.is_active = true
+          and (ur.expires_at is null or ur.expires_at > now())
+        union
+        select p.permission_code
+        from user_roles ur
+        join roles r on r.role_id = ur.role_id
+        join role_permissions rp on rp.role_id = r.role_id
+        join permissions p on p.permission_id = rp.permission_id
+        where ur.user_id = #{userId}
+          and ur.is_active = true
+          and r.is_active = true
+          and p.is_active = true
+          and (ur.expires_at is null or ur.expires_at > now())
+    </select>
+
+    <update id="updateLastLoginAt">
+        update users
+        set last_login_at = now()
+        where user_id = #{userId}
+          and deleted_at is null
+    </update>
+
+    <update id="updateDisplayName">
+        update users
+        set display_name = #{displayName}
+        where user_id = #{userId}
+          and deleted_at is null
+    </update>
+
+    <update id="updatePassword">
+        update users
+        set password_hash = #{passwordHash},
+            password_changed_at = now()
+        where user_id = #{userId}
+          and deleted_at is null
+    </update>
+
+    <update id="softDelete">
+        update users
+        set status = 'WITHDRAWN',
+            deleted_at = now()
+        where user_id = #{userId}
+          and deleted_at is null
+    </update>
+</mapper>
