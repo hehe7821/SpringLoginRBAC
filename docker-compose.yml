@@ -11,6 +11,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: spring_auth
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      SMTP_USER_NAME: ${SMTP_USER_NAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      GMAIL_SMTP_USERNAME: ${GMAIL_SMTP_USERNAME:-}
+      GMAIL_SMTP_PASSWORD: ${GMAIL_SMTP_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
