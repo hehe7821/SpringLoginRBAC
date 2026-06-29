@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -36,13 +37,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 			try {
 				JwtTokenProvider.JwtClaims claims = jwtTokenProvider.parseAndValidate(token, "access");
 				UserDetails userDetails = userDetailsService.loadUserById(claims.userId());
+				if (!userDetails.isEnabled()
+						|| !userDetails.isAccountNonLocked()
+						|| !userDetails.isAccountNonExpired()
+						|| !userDetails.isCredentialsNonExpired()) {
+					SecurityContextHolder.clearContext();
+					filterChain.doFilter(request, response);
+					return;
+				}
 				UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
 						userDetails,
 						null,
 						userDetails.getAuthorities());
 				authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 				SecurityContextHolder.getContext().setAuthentication(authentication);
-			} catch (IllegalArgumentException ignored) {
+			} catch (IllegalArgumentException | AuthenticationException ignored) {
 				SecurityContextHolder.clearContext();
 			}
 		}

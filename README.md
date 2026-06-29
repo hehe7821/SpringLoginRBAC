@@ -31,6 +31,9 @@ EMAIL_VERIFICATION_FROM=
 docker compose up -d --build
 ```
 
+`postgres-18-data` volume이 이미 존재하는 경우 `/docker-entrypoint-initdb.d`의 초기화 SQL은 다시 실행되지 않습니다.
+기존 개발 DB를 새 bigint schema로 다시 만들려면 필요한 데이터를 백업한 뒤 Postgres volume을 재생성하세요.
+
 서비스:
 
 ```text

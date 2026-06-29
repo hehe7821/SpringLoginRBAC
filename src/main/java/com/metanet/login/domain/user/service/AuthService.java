@@ -13,6 +13,7 @@ import com.metanet.login.domain.user.repository.UserRepository;
 import com.metanet.login.global.security.CustomUserDetails;
 import com.metanet.login.global.security.jwt.JwtTokenProvider;
 import java.time.Duration;
+import java.util.Locale;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -46,31 +47,33 @@ public class AuthService {
 
 	@Transactional
 	public TokenResponse signup(SignupRequest request) {
-		validateEmail(request.getEmail());
-		validatePassword(request.getPassword());
-		emailVerificationService.requireVerified(request.getEmail(), EmailVerificationPurpose.SIGNUP);
-		if (userRepository.existsByEmail(request.getEmail())) {
+		String email = normalizeEmail(request == null ? null : request.getEmail());
+		String password = request == null ? null : request.getPassword();
+		validatePassword(password);
+		emailVerificationService.requireVerified(email, EmailVerificationPurpose.SIGNUP);
+		if (userRepository.existsByEmail(email)) {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
 		}
 
 		User user = userRepository.insertUser(
-				request.getEmail().trim(),
-				passwordEncoder.encode(request.getPassword()),
+				email,
+				passwordEncoder.encode(password),
 				blankToNull(request.getDisplayName()));
 		userRepository.assignDefaultUserRole(user.getUserId());
-		emailVerificationService.consumeVerified(request.getEmail(), EmailVerificationPurpose.SIGNUP);
+		emailVerificationService.consumeVerified(email, EmailVerificationPurpose.SIGNUP);
 		return issueTokens(user);
 	}
 
 	@Transactional
 	public TokenResponse login(LoginRequest request) {
-		validateEmail(request.getEmail());
-		if (isBlank(request.getPassword())) {
+		String email = normalizeEmail(request == null ? null : request.getEmail());
+		String password = request == null ? null : request.getPassword();
+		if (isBlank(password)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password is required");
 		}
 
-		User user = userRepository.findByEmail(request.getEmail());
-		if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+		User user = userRepository.findByEmail(email);
+		if (user == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
 			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
 		}
 		if (!"ACTIVE".equals(user.getStatus()) && !"PENDING".equals(user.getStatus())) {
@@ -82,14 +85,15 @@ public class AuthService {
 	}
 
 	public TokenResponse refresh(RefreshTokenRequest request) {
-		if (isBlank(request.getRefreshToken())) {
+		String refreshToken = request == null ? null : request.getRefreshToken();
+		if (isBlank(refreshToken)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refresh token is required");
 		}
 
-		JwtTokenProvider.JwtClaims claims = parseRefreshToken(request.getRefreshToken());
+		JwtTokenProvider.JwtClaims claims = parseRefreshToken(refreshToken);
 		String redisKey = refreshTokenKey(claims.userId());
 		String savedRefreshToken = redisTemplate.opsForValue().get(redisKey);
-		if (!request.getRefreshToken().equals(savedRefreshToken)) {
+		if (!refreshToken.equals(savedRefreshToken)) {
 			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
 		}
 
@@ -104,16 +108,17 @@ public class AuthService {
 
 	@Transactional
 	public void resetPassword(PasswordResetRequest request) {
-		validateEmail(request.getEmail());
-		emailVerificationService.requireVerified(request.getEmail(), EmailVerificationPurpose.PASSWORD_RESET);
-		validatePassword(request.getNewPassword());
-		User user = userRepository.findByEmail(request.getEmail());
+		String email = normalizeEmail(request == null ? null : request.getEmail());
+		String newPassword = request == null ? null : request.getNewPassword();
+		emailVerificationService.requireVerified(email, EmailVerificationPurpose.PASSWORD_RESET);
+		validatePassword(newPassword);
+		User user = userRepository.findByEmail(email);
 		if (user == null) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
 		}
 
-		userRepository.updatePassword(user.getUserId(), passwordEncoder.encode(request.getNewPassword()));
-		emailVerificationService.consumeVerified(request.getEmail(), EmailVerificationPurpose.PASSWORD_RESET);
+		userRepository.updatePassword(user.getUserId(), passwordEncoder.encode(newPassword));
+		emailVerificationService.consumeVerified(email, EmailVerificationPurpose.PASSWORD_RESET);
 		redisTemplate.delete(refreshTokenKey(user.getUserId()));
 	}
 
@@ -191,10 +196,11 @@ public class AuthService {
 		return userDetails.getUserId();
 	}
 
-	private void validateEmail(String email) {
+	private String normalizeEmail(String email) {
 		if (isBlank(email) || !email.contains("@")) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Valid email is required");
 		}
+		return email.trim().toLowerCase(Locale.ROOT);
 	}
 
 	private void validatePassword(String password) {
