@@ -3,7 +3,6 @@ package com.metanet.login.global.security;
 import com.metanet.login.domain.user.entity.User;
 import com.metanet.login.domain.user.repository.UserRepository;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -27,7 +26,7 @@ public class CustomUserDetailsService implements UserDetailsService {
 		return buildUserDetails(user);
 	}
 
-	public UserDetails loadUserById(UUID userId) {
+	public UserDetails loadUserById(Long userId) {
 		User user = userRepository.findById(userId);
 		if (user == null) {
 			throw new UsernameNotFoundException("User not found");

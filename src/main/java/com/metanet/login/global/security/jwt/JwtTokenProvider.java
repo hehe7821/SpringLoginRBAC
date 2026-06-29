@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,11 +35,11 @@ public class JwtTokenProvider {
 		this.refreshTokenValiditySeconds = refreshTokenValiditySeconds;
 	}
 
-	public String createAccessToken(UUID userId, String email) {
+	public String createAccessToken(Long userId, String email) {
 		return createToken(userId, email, "access", accessTokenValiditySeconds);
 	}
 
-	public String createRefreshToken(UUID userId, String email) {
+	public String createRefreshToken(Long userId, String email) {
 		return createToken(userId, email, "refresh", refreshTokenValiditySeconds);
 	}
 
@@ -72,7 +71,7 @@ public class JwtTokenProvider {
 			}
 
 			return new JwtClaims(
-					UUID.fromString(String.valueOf(claims.get("sub"))),
+					Long.parseLong(String.valueOf(claims.get("sub"))),
 					String.valueOf(claims.get("email")),
 					type,
 					exp);
@@ -89,7 +88,7 @@ public class JwtTokenProvider {
 		return refreshTokenValiditySeconds;
 	}
 
-	private String createToken(UUID userId, String email, String type, long validitySeconds) {
+	private String createToken(Long userId, String email, String type, long validitySeconds) {
 		try {
 			long now = Instant.now().getEpochSecond();
 			Map<String, Object> header = new LinkedHashMap<>();
@@ -122,6 +121,6 @@ public class JwtTokenProvider {
 		return mac.doFinal(unsignedToken.getBytes(StandardCharsets.UTF_8));
 	}
 
-	public record JwtClaims(UUID userId, String email, String type, long expiresAt) {
+	public record JwtClaims(Long userId, String email, String type, long expiresAt) {
 	}
 }

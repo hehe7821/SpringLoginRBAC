@@ -1,10 +1,9 @@
 package com.metanet.login.domain.user.entity;
 
 import java.time.OffsetDateTime;
-import java.util.UUID;
 
 public class User {
-	private UUID userId;
+	private Long userId;
 	private String email;
 	private String passwordHash;
 	private String displayName;
@@ -16,11 +15,11 @@ public class User {
 	private OffsetDateTime updatedAt;
 	private OffsetDateTime deletedAt;
 
-	public UUID getUserId() {
+	public Long getUserId() {
 		return userId;
 	}
 
-	public void setUserId(UUID userId) {
+	public void setUserId(Long userId) {
 		this.userId = userId;
 	}
 

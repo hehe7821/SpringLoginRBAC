@@ -13,7 +13,6 @@ import com.metanet.login.domain.user.repository.UserRepository;
 import com.metanet.login.global.security.CustomUserDetails;
 import com.metanet.login.global.security.jwt.JwtTokenProvider;
 import java.time.Duration;
-import java.util.UUID;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -99,7 +98,7 @@ public class AuthService {
 	}
 
 	public void logout(Authentication authentication) {
-		UUID userId = currentUserId(authentication);
+		Long userId = currentUserId(authentication);
 		redisTemplate.delete(refreshTokenKey(userId));
 	}
 
@@ -120,13 +119,13 @@ public class AuthService {
 
 	@Transactional(readOnly = true)
 	public UserResponse getMe(Authentication authentication) {
-		UUID userId = currentUserId(authentication);
+		Long userId = currentUserId(authentication);
 		return new UserResponse(requireUser(userId));
 	}
 
 	@Transactional
 	public UserResponse updateMe(UserUpdateRequest request, Authentication authentication) {
-		UUID userId = currentUserId(authentication);
+		Long userId = currentUserId(authentication);
 		if (request == null || isBlank(request.getDisplayName())) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Display name is required");
 		}
@@ -143,7 +142,7 @@ public class AuthService {
 
 	@Transactional
 	public void withdrawMe(Authentication authentication) {
-		UUID userId = currentUserId(authentication);
+		Long userId = currentUserId(authentication);
 		int updated = userRepository.softDelete(userId);
 		if (updated == 0) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
@@ -173,7 +172,7 @@ public class AuthService {
 		}
 	}
 
-	private User requireUser(UUID userId) {
+	private User requireUser(Long userId) {
 		User user = userRepository.findById(userId);
 		if (user == null) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
@@ -181,11 +180,11 @@ public class AuthService {
 		return user;
 	}
 
-	private String refreshTokenKey(UUID userId) {
+	private String refreshTokenKey(Long userId) {
 		return REFRESH_TOKEN_KEY_PREFIX + userId;
 	}
 
-	private UUID currentUserId(Authentication authentication) {
+	private Long currentUserId(Authentication authentication) {
 		if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails userDetails)) {
 			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
 		}

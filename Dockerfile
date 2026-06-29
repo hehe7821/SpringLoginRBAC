@@ -6,7 +6,7 @@ COPY settings.gradle build.gradle gradlew gradlew.bat ./
 COPY gradle ./gradle
 COPY src ./src
 
-RUN chmod +x gradlew && ./gradlew bootJar --no-daemon
+RUN gradle bootJar --no-daemon
 
 FROM eclipse-temurin:25-jre-alpine
 

@@ -2,19 +2,18 @@ package com.metanet.login.global.security;
 
 import com.metanet.login.domain.user.entity.User;
 import java.util.Collection;
-import java.util.UUID;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 public class CustomUserDetails implements UserDetails {
-	private final UUID userId;
+	private final Long userId;
 	private final String email;
 	private final String password;
 	private final String status;
 	private final Collection<? extends GrantedAuthority> authorities;
 
 	public CustomUserDetails(
-			UUID userId,
+			Long userId,
 			String email,
 			String password,
 			String status,
@@ -35,7 +34,7 @@ public class CustomUserDetails implements UserDetails {
 				authorities);
 	}
 
-	public UUID getUserId() {
+	public Long getUserId() {
 		return userId;
 	}
 

@@ -2,11 +2,10 @@ package com.metanet.login.domain.user.repository;
 
 import com.metanet.login.domain.user.entity.User;
 import java.util.List;
-import java.util.UUID;
 import org.apache.ibatis.annotations.Param;
 
 public interface UserRepository {
-	User findById(@Param("userId") UUID userId);
+	User findById(@Param("userId") Long userId);
 
 	User findByEmail(@Param("email") String email);
 
@@ -17,15 +16,15 @@ public interface UserRepository {
 			@Param("passwordHash") String passwordHash,
 			@Param("displayName") String displayName);
 
-	int assignDefaultUserRole(@Param("userId") UUID userId);
+	int assignDefaultUserRole(@Param("userId") Long userId);
 
-	List<String> findAuthoritiesByUserId(@Param("userId") UUID userId);
+	List<String> findAuthoritiesByUserId(@Param("userId") Long userId);
 
-	int updateLastLoginAt(@Param("userId") UUID userId);
+	int updateLastLoginAt(@Param("userId") Long userId);
 
-	int updateDisplayName(@Param("userId") UUID userId, @Param("displayName") String displayName);
+	int updateDisplayName(@Param("userId") Long userId, @Param("displayName") String displayName);
 
-	int updatePassword(@Param("userId") UUID userId, @Param("passwordHash") String passwordHash);
+	int updatePassword(@Param("userId") Long userId, @Param("passwordHash") String passwordHash);
 
-	int softDelete(@Param("userId") UUID userId);
+	int softDelete(@Param("userId") Long userId);
 }

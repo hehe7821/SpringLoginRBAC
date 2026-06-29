@@ -1,7 +1,6 @@
 package com.metanet.login.domain.user.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.util.UUID;
 
 public class TokenResponse {
 	@Schema(example = "Bearer")
@@ -13,9 +12,9 @@ public class TokenResponse {
 	@Schema(description = "Access token expiration seconds", example = "900")
 	private long expiresIn;
 	@Schema(description = "Authenticated user id")
-	private UUID userId;
+	private Long userId;
 
-	public TokenResponse(String accessToken, String refreshToken, long expiresIn, UUID userId) {
+	public TokenResponse(String accessToken, String refreshToken, long expiresIn, Long userId) {
 		this.accessToken = accessToken;
 		this.refreshToken = refreshToken;
 		this.expiresIn = expiresIn;
@@ -38,7 +37,7 @@ public class TokenResponse {
 		return expiresIn;
 	}
 
-	public UUID getUserId() {
+	public Long getUserId() {
 		return userId;
 	}
 }

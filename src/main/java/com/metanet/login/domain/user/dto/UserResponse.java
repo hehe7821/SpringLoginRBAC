@@ -2,10 +2,9 @@ package com.metanet.login.domain.user.dto;
 
 import com.metanet.login.domain.user.entity.User;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 
 public class UserResponse {
-	private final UUID userId;
+	private final Long userId;
 	private final String email;
 	private final String displayName;
 	private final String status;
@@ -25,7 +24,7 @@ public class UserResponse {
 		this.updatedAt = user.getUpdatedAt();
 	}
 
-	public UUID getUserId() {
+	public Long getUserId() {
 		return userId;
 	}
 
