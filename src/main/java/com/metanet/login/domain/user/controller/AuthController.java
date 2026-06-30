@@ -1,6 +1,7 @@
 package com.metanet.login.domain.user.controller;
 
 import com.metanet.login.domain.user.dto.LoginRequest;
+import com.metanet.login.domain.user.dto.OAuth2TokenRequest;
 import com.metanet.login.domain.user.dto.PasswordResetRequest;
 import com.metanet.login.domain.user.dto.RefreshTokenRequest;
 import com.metanet.login.domain.user.dto.SignupRequest;
@@ -67,6 +68,14 @@ public class AuthController {
 	@Operation(summary = "Refresh JWT", description = "Issues new JWT tokens using a valid refresh token.")
 	public TokenResponse refresh(@RequestBody RefreshTokenRequest request) {
 		return authService.refresh(request);
+	}
+
+	@PostMapping("/auth/oauth2/token")
+	@Operation(
+			summary = "Exchange OAuth2 login code",
+			description = "Exchanges the one-time code from /oauth2/success?code=... for JWT access and refresh tokens.")
+	public TokenResponse exchangeOAuth2Token(@RequestBody OAuth2TokenRequest request) {
+		return authService.exchangeOAuth2Token(request);
 	}
 
 	@PostMapping("/auth/logout")

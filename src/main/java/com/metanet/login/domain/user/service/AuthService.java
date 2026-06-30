@@ -1,6 +1,7 @@
 package com.metanet.login.domain.user.service;
 
 import com.metanet.login.domain.user.dto.LoginRequest;
+import com.metanet.login.domain.user.dto.OAuth2TokenRequest;
 import com.metanet.login.domain.user.dto.PasswordResetRequest;
 import com.metanet.login.domain.user.dto.RefreshTokenRequest;
 import com.metanet.login.domain.user.dto.SignupRequest;
@@ -31,18 +32,21 @@ public class AuthService {
 	private final JwtTokenProvider jwtTokenProvider;
 	private final StringRedisTemplate redisTemplate;
 	private final EmailVerificationService emailVerificationService;
+	private final OAuth2LoginCodeService oAuth2LoginCodeService;
 
 	public AuthService(
 			UserRepository userRepository,
 			PasswordEncoder passwordEncoder,
 			JwtTokenProvider jwtTokenProvider,
 			StringRedisTemplate redisTemplate,
-			EmailVerificationService emailVerificationService) {
+			EmailVerificationService emailVerificationService,
+			OAuth2LoginCodeService oAuth2LoginCodeService) {
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.jwtTokenProvider = jwtTokenProvider;
 		this.redisTemplate = redisTemplate;
 		this.emailVerificationService = emailVerificationService;
+		this.oAuth2LoginCodeService = oAuth2LoginCodeService;
 	}
 
 	@Transactional
@@ -57,8 +61,8 @@ public class AuthService {
 
 		User user = userRepository.insertUser(
 				email,
-				passwordEncoder.encode(password),
 				blankToNull(request.getDisplayName()));
+		userRepository.insertUserCredential(user.getUserId(), passwordEncoder.encode(password));
 		userRepository.assignDefaultUserRole(user.getUserId());
 		emailVerificationService.consumeVerified(email, EmailVerificationPurpose.SIGNUP);
 		return issueTokens(user);
@@ -73,7 +77,8 @@ public class AuthService {
 		}
 
 		User user = userRepository.findByEmail(email);
-		if (user == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
+		String passwordHash = user == null ? null : userRepository.findPasswordHashByUserId(user.getUserId());
+		if (user == null || passwordHash == null || !passwordEncoder.matches(password, passwordHash)) {
 			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
 		}
 		if (!"ACTIVE".equals(user.getStatus()) && !"PENDING".equals(user.getStatus())) {
@@ -98,6 +103,13 @@ public class AuthService {
 		}
 
 		User user = requireUser(claims.userId());
+		return issueTokens(user);
+	}
+
+	public TokenResponse exchangeOAuth2Token(OAuth2TokenRequest request) {
+		String code = request == null ? null : request.getCode();
+		Long userId = oAuth2LoginCodeService.consumeLoginCode(code);
+		User user = requireUser(userId);
 		return issueTokens(user);
 	}
 
@@ -152,6 +164,7 @@ public class AuthService {
 		if (updated == 0) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
 		}
+		userRepository.softDeleteOAuthAccounts(userId);
 		redisTemplate.delete(refreshTokenKey(userId));
 	}
 

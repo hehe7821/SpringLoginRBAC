@@ -5,12 +5,10 @@ import java.time.OffsetDateTime;
 public class User {
 	private Long userId;
 	private String email;
-	private String passwordHash;
 	private String displayName;
 	private String status;
 	private OffsetDateTime emailVerifiedAt;
 	private OffsetDateTime lastLoginAt;
-	private OffsetDateTime passwordChangedAt;
 	private OffsetDateTime createdAt;
 	private OffsetDateTime updatedAt;
 	private OffsetDateTime deletedAt;
@@ -29,14 +27,6 @@ public class User {
 
 	public void setEmail(String email) {
 		this.email = email;
-	}
-
-	public String getPasswordHash() {
-		return passwordHash;
-	}
-
-	public void setPasswordHash(String passwordHash) {
-		this.passwordHash = passwordHash;
 	}
 
 	public String getDisplayName() {
@@ -69,14 +59,6 @@ public class User {
 
 	public void setLastLoginAt(OffsetDateTime lastLoginAt) {
 		this.lastLoginAt = lastLoginAt;
-	}
-
-	public OffsetDateTime getPasswordChangedAt() {
-		return passwordChangedAt;
-	}
-
-	public void setPasswordChangedAt(OffsetDateTime passwordChangedAt) {
-		this.passwordChangedAt = passwordChangedAt;
 	}
 
 	public OffsetDateTime getCreatedAt() {

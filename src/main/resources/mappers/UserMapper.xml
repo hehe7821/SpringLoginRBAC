@@ -6,20 +6,23 @@
     <resultMap id="UserResultMap" type="com.metanet.login.domain.user.entity.User">
         <id property="userId" column="user_id"/>
         <result property="email" column="email"/>
-        <result property="passwordHash" column="password_hash"/>
         <result property="displayName" column="display_name"/>
         <result property="status" column="status"/>
         <result property="emailVerifiedAt" column="email_verified_at"/>
         <result property="lastLoginAt" column="last_login_at"/>
-        <result property="passwordChangedAt" column="password_changed_at"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
         <result property="deletedAt" column="deleted_at"/>
     </resultMap>
 
     <sql id="userColumns">
-        user_id, email, password_hash, display_name, status, email_verified_at,
-        last_login_at, password_changed_at, created_at, updated_at, deleted_at
+        user_id, email, display_name, status, email_verified_at,
+        last_login_at, created_at, updated_at, deleted_at
+    </sql>
+
+    <sql id="userColumnsWithUserAlias">
+        u.user_id, u.email, u.display_name, u.status, u.email_verified_at,
+        u.last_login_at, u.created_at, u.updated_at, u.deleted_at
     </sql>
 
     <select id="findById" resultMap="UserResultMap">
@@ -46,9 +49,22 @@
     </select>
 
     <select id="insertUser" resultMap="UserResultMap">
-        insert into users (email, password_hash, display_name)
-        values (#{email}, #{passwordHash}, #{displayName})
+        insert into users (email, display_name, email_verified_at)
+        values (#{email}, #{displayName}, now())
         returning <include refid="userColumns"/>
+    </select>
+
+    <insert id="insertUserCredential">
+        insert into user_credentials (user_id, password_hash, password_changed_at)
+        values (#{userId}, #{passwordHash}, now())
+    </insert>
+
+    <select id="findPasswordHashByUserId" resultType="string">
+        select uc.password_hash
+        from user_credentials uc
+        join users u on u.user_id = uc.user_id
+        where uc.user_id = #{userId}
+          and u.deleted_at is null
     </select>
 
     <insert id="assignDefaultUserRole">
@@ -96,17 +112,46 @@
     </update>
 
     <update id="updatePassword">
-        update users
-        set password_hash = #{passwordHash},
-            password_changed_at = now()
-        where user_id = #{userId}
-          and deleted_at is null
+        insert into user_credentials (user_id, password_hash, password_changed_at)
+        select #{userId}, #{passwordHash}, now()
+        where exists (
+            select 1
+            from users
+            where users.user_id = #{userId}
+              and users.deleted_at is null
+        )
+        on conflict (user_id) do update
+        set password_hash = excluded.password_hash,
+            password_changed_at = excluded.password_changed_at
     </update>
+
+    <select id="findByOAuthAccount" resultMap="UserResultMap">
+        select <include refid="userColumnsWithUserAlias"/>
+        from oauth_accounts oa
+        join users u on u.user_id = oa.user_id
+        where oa.provider = #{provider}
+          and oa.provider_user_id = #{providerUserId}
+          and oa.deleted_at is null
+          and u.deleted_at is null
+    </select>
+
+    <insert id="insertOAuthAccount">
+        insert into oauth_accounts (user_id, provider, provider_user_id, email, email_verified)
+        values (#{userId}, #{provider}, #{providerUserId}, #{email}, #{emailVerified})
+        on conflict do nothing
+    </insert>
 
     <update id="softDelete">
         update users
         set status = 'WITHDRAWN',
             deleted_at = now()
+        where user_id = #{userId}
+          and deleted_at is null
+    </update>
+
+    <update id="softDeleteOAuthAccounts">
+        update oauth_accounts
+        set deleted_at = now()
         where user_id = #{userId}
           and deleted_at is null
     </update>
