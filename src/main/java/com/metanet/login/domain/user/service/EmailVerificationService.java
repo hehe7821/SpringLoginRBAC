@@ -115,12 +115,12 @@ public class EmailVerificationService {
 		SimpleMailMessage message = new SimpleMailMessage();
 		message.setFrom(fromAddress);
 		message.setTo(email);
-		message.setSubject("[Spring Auth] Email verification code");
+		message.setSubject("[Spring Auth] 이메일 인증 코드 발송");
 		message.setText("""
-				Your verification code is %s.
+				인증코드 : %s
 
 				Purpose: %s
-				This code expires in %d minutes.
+				이 코드는 %d분 뒤에 만료됩니다..
 				""".formatted(code, purpose.name(), Math.max(1, codeTtlSeconds / 60)));
 		try {
 			mailSender.send(message);

@@ -29,7 +29,7 @@ public class CustomUserDetails implements UserDetails {
 		return new CustomUserDetails(
 				user.getUserId(),
 				user.getEmail(),
-				user.getPasswordHash(),
+				"",
 				user.getStatus(),
 				authorities);
 	}

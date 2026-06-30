@@ -11,12 +11,10 @@ $$ language plpgsql;
 create table if not exists users (
     user_id bigint primary key generated always as identity,
     email citext not null,
-    password_hash text not null,
     display_name varchar(50),
     status varchar(20) not null default 'ACTIVE',
     email_verified_at timestamptz,
     last_login_at timestamptz,
-    password_changed_at timestamptz,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     deleted_at timestamptz,
@@ -34,6 +32,63 @@ on users (status);
 drop trigger if exists trg_users_updated_at on users;
 create trigger trg_users_updated_at
 before update on users
+for each row
+execute function update_updated_at_column();
+
+create table if not exists user_credentials (
+    user_id bigint primary key,
+    password_hash text not null,
+    password_changed_at timestamptz,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    constraint fk_user_credentials_user
+        foreign key (user_id)
+        references users (user_id)
+        on delete cascade
+);
+
+drop trigger if exists trg_user_credentials_updated_at on user_credentials;
+create trigger trg_user_credentials_updated_at
+before update on user_credentials
+for each row
+execute function update_updated_at_column();
+
+create table if not exists oauth_accounts (
+    oauth_account_id bigint primary key generated always as identity,
+    user_id bigint not null,
+    provider varchar(30) not null,
+    provider_user_id text not null,
+    email citext,
+    email_verified boolean not null default false,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz,
+    constraint fk_oauth_accounts_user
+        foreign key (user_id)
+        references users (user_id)
+        on delete cascade,
+    constraint chk_oauth_provider
+        check (provider in ('GOOGLE'))
+);
+
+create unique index if not exists uq_oauth_provider_user_active
+on oauth_accounts (provider, provider_user_id)
+where deleted_at is null;
+
+create unique index if not exists uq_oauth_user_provider_active
+on oauth_accounts (user_id, provider)
+where deleted_at is null;
+
+create index if not exists idx_oauth_accounts_user_id
+on oauth_accounts (user_id);
+
+create index if not exists idx_oauth_accounts_provider_email
+on oauth_accounts (provider, email)
+where deleted_at is null;
+
+drop trigger if exists trg_oauth_accounts_updated_at on oauth_accounts;
+create trigger trg_oauth_accounts_updated_at
+before update on oauth_accounts
 for each row
 execute function update_updated_at_column();
 

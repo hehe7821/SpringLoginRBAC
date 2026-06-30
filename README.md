@@ -268,12 +268,10 @@ $$ language plpgsql;
 | --- | --- | --- |
 | `user_id` | `bigint` | PK, generated always as identity |
 | `email` | `citext` | Login email |
-| `password_hash` | `text` | BCrypt password hash |
 | `display_name` | `varchar(50)` | Display name |
 | `status` | `varchar(20)` | `ACTIVE`, `PENDING`, `LOCKED`, `WITHDRAWN` |
 | `email_verified_at` | `timestamptz` | Email verification timestamp |
 | `last_login_at` | `timestamptz` | Last login timestamp |
-| `password_changed_at` | `timestamptz` | Password changed timestamp |
 | `created_at` | `timestamptz` | Created timestamp |
 | `updated_at` | `timestamptz` | Updated timestamp |
 | `deleted_at` | `timestamptz` | Soft delete timestamp |
@@ -293,9 +291,34 @@ on users (status);
 
 Current behavior:
 
-- Signup inserts `email`, `password_hash`, `display_name`; `user_id`, timestamps, and `status` are DB defaults.
+- Signup inserts `email` and `display_name` into `users`, then stores the BCrypt password hash in `user_credentials`.
+- Google OAuth login stores the provider link in `oauth_accounts` and always uses `users.user_id` as the JWT subject.
 - Withdraw sets `status = 'WITHDRAWN'` and `deleted_at = now()`.
 - Queries ignore users where `deleted_at is not null`.
+
+### user_credentials
+
+| Column | Type | Description |
+| --- | --- | --- |
+| `user_id` | `bigint` | PK/FK to `users.user_id` |
+| `password_hash` | `text` | BCrypt password hash |
+| `password_changed_at` | `timestamptz` | Password changed timestamp |
+| `created_at` | `timestamptz` | Created timestamp |
+| `updated_at` | `timestamptz` | Updated timestamp |
+
+### oauth_accounts
+
+| Column | Type | Description |
+| --- | --- | --- |
+| `oauth_account_id` | `bigint` | PK, generated always as identity |
+| `user_id` | `bigint` | FK to `users.user_id` |
+| `provider` | `varchar(30)` | OAuth provider, currently `GOOGLE` |
+| `provider_user_id` | `text` | Stable provider subject, Google `sub` |
+| `email` | `citext` | Email returned by provider |
+| `email_verified` | `boolean` | Provider email verification flag |
+| `created_at` | `timestamptz` | Created timestamp |
+| `updated_at` | `timestamptz` | Updated timestamp |
+| `deleted_at` | `timestamptz` | Soft delete timestamp |
 
 ### roles
 
@@ -396,3 +419,41 @@ Timestamp columns use `timestamptz` and DB-side `now()`. The stored value repres
 - Passwords are stored as BCrypt hashes.
 - JWT is signed with HMAC-SHA256.
 - Swagger is open in the current development configuration. Restrict it by profile or authentication before production use.
+
+## Google OAuth2
+
+Set the following values in `.env` when running with Docker Compose:
+
+```env
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+OAUTH2_AUTHORIZED_REDIRECT_URI=http://localhost:3000/oauth2/success
+OAUTH2_FAILURE_REDIRECT_URI=http://localhost:3000/login?error=oauth2
+```
+
+Register this backend callback URI in Google Cloud Console:
+
+```text
+http://localhost:8080/login/oauth2/code/google
+```
+
+The backend redirects to `OAUTH2_AUTHORIZED_REDIRECT_URI` with a short-lived one-time code.
+The frontend should exchange it for JWT tokens:
+
+```http
+POST /api/v1/auth/oauth2/token
+Content-Type: application/json
+
+{
+  "code": "<one-time-code>"
+}
+```
+
+## Authentication Storage
+
+All account types have one row in `users`, and JWT `sub` always contains `users.user_id`.
+
+- `user_credentials`: email/password login credentials.
+- `oauth_accounts`: external OAuth provider links such as Google.
+- Google login with a verified email reuses an existing active `users.email` row when present.
+- Account withdrawal soft-deletes `users` and linked `oauth_accounts`.

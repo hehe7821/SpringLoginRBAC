@@ -18,7 +18,7 @@ public class OpenApiConfig {
 				.info(new Info()
 						.title("Spring Auth Template API")
 						.version("v1")
-						.description("JWT authentication and user account API"))
+						.description("JWT authentication, Google OAuth2 login, and user account API"))
 				.components(new Components()
 						.addSecuritySchemes(BEARER_AUTH, new SecurityScheme()
 								.type(SecurityScheme.Type.HTTP)
